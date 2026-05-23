@@ -650,35 +650,39 @@ body.fiche-mode .app-sidebar-right {
   
   /* 1. Le panneau latéral devient un "Bottom Sheet" (Tiroir du bas) */
   .app-sidebar-left {
-    top: auto;
-    bottom: 0;
+    top: auto;                 /* Annule le collage en haut */
+    bottom: 0;                 /* Se colle en bas de l'écran */
     left: 0;
-    width: 100%;
+    width: 100%;               /* Prend toute la largeur du téléphone */
     height: auto;
-    max-height: 75vh; /* Laisse le haut de l'écran visible pour la carte */
-    border-radius: 24px 24px 0 0; /* Arrondi sur le dessus */
+    max-height: 65vh;          /* Ne dépasse pas 65% de l'écran pour laisser voir la carte au-dessus */
+    border-radius: 24px 24px 0 0; /* Arrondit uniquement les coins du haut */
     border-right: none;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
-    
-    /* On change le sens de l'animation : il vient d'en bas ! */
-    transform: translateY(110%); 
-    overflow-y: auto; /* Permet de scroller si le texte est long */
-    padding: 30px 20px 40px 20px;
+    padding: 30px 20px;
+    overflow-y: auto;          /* Permet de faire défiler le texte s'il est long */
+
+    /* 🌟 CHANGEMENT DE DIRECTION : Le panneau glisse désormais depuis le BAS (Y) */
+    transform: translateY(110%);
+    transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.5s;
   }
 
+  /* Quand la fiche s'ouvre, elle remonte à sa position normale */
   body.fiche-mode .app-sidebar-left {
     transform: translateY(0);
   }
 
-  /* 2. La barre de recherche prend toute la largeur dispo */
-  .floating-search.active {
-    width: calc(100vw - 40px); /* 100% de l'écran moins les marges */
-    min-width: auto;
+  /* On réduit légèrement la taille du texte pour les petits écrans */
+  .fiche-header h2 {
+    font-size: 2rem;
   }
 
-  /* 3. Ajustement de la taille du titre sur petit écran */
-  .fiche-header h2 {
-    font-size: 2.2rem;
+  .fiche-stats-grid {
+    gap: 10px; /* Rapproche un peu les deux cartes de statistiques */
+  }
+
+  .stat-card {
+    padding: 12px; /* Rend les widgets de stats un poil plus compacts */
   }
   /* 1. On transforme la colonne des régions en une barre horizontale en bas de l'écran */
   .app-sidebar-right {
