@@ -81,31 +81,45 @@ function ouvrirFiche(id) {
     const tailleDeBasePx = rect.width / zoomScale; 
     const pixelRatio = tailleDeBasePx / vb[2];
     
-    const isMobile = window.innerWidth <= 768;
+    // --- BLOC RESPONSIVE ---
+    const conteneurRect = carteContainer.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
     
-    // 🌟 1. On réduit fortement le zoom pour mobile
-    zoomScale = isMobile ? 1.4 : 2.4; 
+    // Définition des 3 paliers
+    const isMobile = windowWidth <= 768;
+    const isTablet = windowWidth > 768 && windowWidth <= 1024;
     
+    // 1. Échelle de zoom adaptée au support
+    zoomScale = isMobile ? 1.4 : (isTablet ? 1.8 : 2.4); 
+    
+    // 2. Décalages dynamiques basés sur le % de l'écran
+    let decalagePanneauX = 0;
+    let decalagePanneauY = 0;
+    
+    if (isMobile) {
+      // iPhone : La fiche est en Bottom Sheet (bas). On remonte la carte visuellement de 25%.
+      decalagePanneauY = -(conteneurRect.height * 0.25); 
+    } else if (isTablet) {
+      // iPad : Le panneau latéral est là, on pousse la carte de 15% vers la droite
+      decalagePanneauX = conteneurRect.width * 0.15;
+    } else {
+      // PC : Large écran, on pousse la carte de 20% vers la droite pour équilibrer
+      decalagePanneauX = conteneurRect.width * 0.20; 
+    }
+
+    // Application des corrections spécifiques à certaines provinces extrêmes
     const correctionsManuelles = {
-      "LamDong": { x: -580, y: 10 }
+      "LamDong": { x: isMobile ? 0 : -300, y: 10 },
+      "DienBien": { x: isMobile ? 0 : 200, y: isMobile ? 50 : 100 }
     };
     
-    // 🌟 2. On calcule sur la taille fixe du conteneur (qui gère bien Safari grâce au 100dvh)
-    const conteneurHauteur = carteContainer.getBoundingClientRect().height;
-    
-    // 🌟 3. Sur mobile, on remonte la carte visuellement de 25% pour qu'elle s'affiche au-dessus de la fiche
-    let pointAncrageX = isMobile ? 0 : 730; 
-    let pointAncrageY = isMobile ? -(conteneurHauteur * 0.25) : 0; 
-    
-    // On n'applique les corrections manuelles (décalage à gauche) que sur PC
-    if (correctionsManuelles[id] && !isMobile) {
-      pointAncrageX += correctionsManuelles[id].x;
-      pointAncrageY += correctionsManuelles[id].y;
+    if (correctionsManuelles[id]) {
+      decalagePanneauX += correctionsManuelles[id].x;
+      decalagePanneauY += correctionsManuelles[id].y;
     }
     
-    translateX = (svgCenterX - provinceX) * pixelRatio * zoomScale + pointAncrageX;
-    translateY = (svgCenterY - provinceY) * pixelRatio * zoomScale + pointAncrageY;
-    // 📱 --- FIN DU BLOC RESPONSIVE ---
+    translateX = (svgCenterX - provinceX) * pixelRatio * zoomScale + decalagePanneauX;
+    translateY = (svgCenterY - provinceY) * pixelRatio * zoomScale + decalagePanneauY;
     
     document.body.classList.add('zoomed');
     document.documentElement.style.setProperty('--stroke-dynamic-width', `${0.6 / Math.sqrt(zoomScale)}px`);
@@ -238,9 +252,24 @@ let initialZoom = 1;
 let pinchCenterX = 0;
 let pinchCenterY = 0;
 
-if (svgMap) {
-  // --- ÉVÉNEMENTS SOURIS (PC) ---
-  svgMap.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
+// --- ÉVÉNEMENTS SOURIS (PC) ---
+  svgMap.addEventListener('mousedown', (e) => {
+    // Si tu veux aussi empêcher de bouger la carte sur PC quand la fiche est ouverte, décommente la ligne dessous
+    // if (document.body.classList.contains('fiche-mode')) return;
+    startDrag(e.clientX, e.clientY);
+  });
+  
+  // 🛑 LES DEUX LIGNES MANQUANTES POUR LE PC SONT LÀ :
+  window.addEventListener('mousemove', (e) => {
+    if (isPanning) doDrag(e.clientX, e.clientY);
+  });
+  
+  window.addEventListener('mouseup', () => {
+    if (isPanning) {
+      isPanning = false;
+      if (svgMap) svgMap.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
+    }
+  });
   
   // --- ÉVÉNEMENTS TACTILES (MOBILE) ---
   svgMap.addEventListener('touchstart', (e) => {
@@ -271,61 +300,50 @@ if (svgMap) {
     }
   }, { passive: false }); // 🛑 Doit être "false" pour pouvoir bloquer le comportement de Safari
 
-  window.addEventListener('touchmove', (e) => {
-    if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
+window.addEventListener('touchmove', (e) => {
+  if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
 
-    if (e.touches.length === 1 && isPanning) {
-      // 👆 UN DOIGT : On déplace la carte
-      e.preventDefault(); 
-      doDrag(e.touches[0].clientX, e.touches[0].clientY);
-    } 
-    else if (e.touches.length === 2 && initialPinchDistance) {
-      // ✌️ DEUX DOIGTS : On zoome la carte
-      e.preventDefault();
-      if (document.body.classList.contains('fiche-mode')) userInteractedWithZoom = true;
-      
-      const t1 = e.touches[0];
-      const t2 = e.touches[1];
-      
-      // Nouvelle distance entre les doigts
-      const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      
-      // Calcul du nouveau zoom basé sur l'écartement
-      const scaleChange = currentDistance / initialPinchDistance;
-      const nouveauZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, initialZoom * scaleChange));
-      
-      if (nouveauZoom === zoomScale) return;
+  if (e.touches.length === 1 && isPanning) {
+    // 👆 UN DOIGT : Glissement (Drag)
+    e.preventDefault();
+    doDrag(e.touches[0].clientX, e.touches[0].clientY);
+    
+  } else if (e.touches.length === 2 && initialPinchDistance) {
+    // ✌️ DEUX DOIGTS : Pinch-to-Zoom
+    e.preventDefault();
+    if (document.body.classList.contains('fiche-mode')) userInteractedWithZoom = true;
 
-      // Calcul magique (comme la molette) pour garder la carte centrée sous les doigts
-      const cx = carteContainer.getBoundingClientRect().width / 2;
-      const cy = carteContainer.getBoundingClientRect().height / 2;
-      const dx = pinchCenterX - cx;
-      const dy = pinchCenterY - cy;
+    const t1 = e.touches[0];
+    const t2 = e.touches[1];
 
-      const ratio = nouveauZoom / zoomScale;
-      translateX = translateX * ratio + dx * (1 - ratio);
-      translateY = translateY * ratio + dy * (1 - ratio);
-      
-      zoomScale = nouveauZoom;
-      document.documentElement.style.setProperty('--stroke-dynamic-width', `${0.6 / Math.sqrt(zoomScale)}px`);
-      
-      // On enlève la transition pour que le zoom au doigt soit instantané et fluide
-      svgMap.style.transition = 'none'; 
-      appliquerTransformation();
-    }
-  }, { passive: false });
-  
-  // Quand on lève le ou les doigts, on remet les animations fluides en marche
-  window.addEventListener('touchend', () => {
-    initialPinchDistance = null;
-    if (isPanning) {
-      isPanning = false;
-    }
-    if (svgMap) {
-      svgMap.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
-    }
-  });
-}
+    // Nouvelle distance entre les doigts
+    const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    const scaleChange = currentDistance / initialPinchDistance;
+    const nouveauZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, initialZoom * scaleChange));
+
+    if (nouveauZoom === zoomScale) return;
+
+    // Calcul magique pour centrer le zoom sous les doigts
+    const ratio = nouveauZoom / zoomScale;
+    const rect = carteContainer.getBoundingClientRect();
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    const dx = pinchCenterX - cx;
+    const dy = pinchCenterY - cy;
+
+    translateX = translateX * ratio + dx * (1 - ratio);
+    translateY = translateY * ratio + dy * (1 - ratio);
+
+    ajusterZoom(nouveauZoom);
+  }
+}, { passive: false });
+
+window.addEventListener('touchend', (e) => {
+  if (e.touches.length < 2) initialPinchDistance = null; // Stoppe le Pinch
+  if (e.touches.length === 0) endDrag(); // Stoppe le glissement
+});
+
 // =========================================================
 // RÉPARATION DU BOUTON RETOUR
 // =========================================================
