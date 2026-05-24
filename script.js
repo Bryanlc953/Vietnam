@@ -8,7 +8,7 @@ const hoverLabel = document.getElementById('province-hover-label');
 const isMobileInit = window.innerWidth <= 768;
 
 // 🌟 ZOOM_MIN n'est plus une constante, il est plus petit sur mobile (0.7)
-let ZOOM_MIN = isMobileInit ? 0.7 : 1.0; 
+let ZOOM_MIN = isMobileInit ? 0.9 : 1.0; 
 let zoomScale = ZOOM_MIN; 
 const ZOOM_MAX = 4.5;
 const ZOOM_STEP = 0.2;
@@ -24,6 +24,7 @@ let userInteractedWithZoom = false;
 // =========================================================
 document.querySelectorAll('.province').forEach(el => {
   el.addEventListener('mouseenter', () => {
+    if (window.innerWidth <= 1024) return;
     if (el.parentNode && el.parentNode.lastElementChild !== el) {
       el.parentNode.appendChild(el);
     }
@@ -97,20 +98,45 @@ function ouvrirFiche(id) {
     let decalagePanneauY = 0;
     
     if (isMobile) {
-      // iPhone : La fiche est en Bottom Sheet (bas). On remonte la carte visuellement de 25%.
-      decalagePanneauY = -(conteneurRect.height * 0.25); 
-    } else if (isTablet) {
+      // Zoom global sur mobile (à augmenter si tu veux que la carte soit plus grosse)
+      zoomScale = 1.4; 
+      
+      // 🌟 NOUVEAU : On récupère la région de la province cliquée
+      const regionDeLaProvince = regionMapping[id];
+      
+      // On applique un ancrage différent selon la zone géographique
+      if (regionDeLaProvince === "Sud") {
+         // LE SUD : Souvent coupé en bas à droite. 
+         // -> On le pousse vers la GAUCHE (-90) et on le remonte un peu plus haut
+         decalagePanneauX = 230; 
+         decalagePanneauY = -(conteneurRect.height * 0.05);
+         
+      } else if (regionDeLaProvince === "Nord") {
+         // LE NORD : Très large en haut.
+         // -> On le pousse vers la DROITE (+40) et on le descend un peu pour l'encoche
+         decalagePanneauX = 270;
+         decalagePanneauY = -(conteneurRect.height * 0.20);
+         
+      } else {
+         // LE CENTRE (ou par défaut) : Relativement fin et droit.
+         // -> Petit ajustement à gauche (-20) et hauteur classique
+         decalagePanneauX = 250;
+         decalagePanneauY = -(conteneurRect.height * 0.15); 
+      }
+    } 
+    else if (isTablet) {
       // iPad : Le panneau latéral est là, on pousse la carte de 15% vers la droite
       decalagePanneauX = conteneurRect.width * 0.15;
     } else {
       // PC : Large écran, on pousse la carte de 20% vers la droite pour équilibrer
-      decalagePanneauX = conteneurRect.width * 0.20; 
+      decalagePanneauX = conteneurRect.width * 0.40; 
     }
 
     // Application des corrections spécifiques à certaines provinces extrêmes
     const correctionsManuelles = {
-      "LamDong": { x: isMobile ? 0 : -300, y: 10 },
-      "DienBien": { x: isMobile ? 0 : 200, y: isMobile ? 50 : 100 }
+      "LamDong": { x: isMobile ? -200 : -550, y: 10 }, // premier chiffre est pour le smartphone, le second pour le PC
+      "DienBien": { x: isMobile ? -90 : -100, y: isMobile ? 50 : 100 },
+      "LaiChau": { x: isMobile ? -80 : -80, y: isMobile ? 30 : 60 },
     };
     
     if (correctionsManuelles[id]) {
@@ -218,12 +244,12 @@ document.getElementById('zoomReset')?.addEventListener('click', () => {
 const startDrag = (clientX, clientY) => {
   startClickX = clientX;
   startClickY = clientY;
-  if (zoomScale > ZOOM_MIN) {
-    isPanning = true;
-    svgMap.style.transition = 'none'; 
-    startX = clientX - translateX;
-    startY = clientY - translateY;
-  }
+  
+  // 🌟 On a supprimé la condition de zoom ! On peut "drag" tout le temps.
+  isPanning = true;
+  if (svgMap) svgMap.style.transition = 'none'; 
+  startX = clientX - translateX;
+  startY = clientY - translateY;
 };
 
 // Fonction de déplacement
@@ -231,10 +257,17 @@ const doDrag = (clientX, clientY) => {
   if (!isPanning) return;
   if (document.body.classList.contains('fiche-mode')) userInteractedWithZoom = true;
   
-  const limiteX = (zoomScale - ZOOM_MIN) * 800;
-  const limiteY = (zoomScale - ZOOM_MIN) * 1000;
+  // 🌟 Tolérance dynamique : Permet un glissement "limité" sur mobile même au zoom minimum
+  const margeDeGlissementX = window.innerWidth <= 768 ? 120 : 0; // 120px de glissement autorisé à gauche/droite
+  const margeDeGlissementY = window.innerWidth <= 768 ? 200 : 0; // 200px en haut/bas
+  
+  // On calcule les limites physiques de la caméra
+  const limiteX = margeDeGlissementX + ((zoomScale - ZOOM_MIN) * 800);
+  const limiteY = margeDeGlissementY + ((zoomScale - ZOOM_MIN) * 1000);
+  
   translateX = Math.max(-limiteX, Math.min(limiteX, clientX - startX));
   translateY = Math.max(-limiteY, Math.min(limiteY, clientY - startY));
+  
   appliquerTransformation();
 };
 
@@ -273,8 +306,9 @@ let pinchCenterY = 0;
   
   // --- ÉVÉNEMENTS TACTILES (MOBILE) ---
   svgMap.addEventListener('touchstart', (e) => {
-    // Si la fiche est ouverte, on gèle la carte
-    if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
+    // 🌟 NOUVEAU : On gèle la carte UNIQUEMENT si la fiche est agrandie au max
+    const sidebarLeft = document.querySelector('.app-sidebar-left');
+    if (window.innerWidth <= 768 && sidebarLeft && sidebarLeft.classList.contains('sheet-expanded')) return;
     
     if (e.touches.length === 1) {
       // 👆 UN DOIGT : Glissement normal (Drag)
@@ -301,8 +335,8 @@ let pinchCenterY = 0;
   }, { passive: false }); // 🛑 Doit être "false" pour pouvoir bloquer le comportement de Safari
 
 window.addEventListener('touchmove', (e) => {
-  if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
-
+  const sidebarLeft = document.querySelector('.app-sidebar-left');
+  if (window.innerWidth <= 768 && sidebarLeft && sidebarLeft.classList.contains('sheet-expanded')) return;
   if (e.touches.length === 1 && isPanning) {
     // 👆 UN DOIGT : Glissement (Drag)
     e.preventDefault();
@@ -339,66 +373,74 @@ window.addEventListener('touchmove', (e) => {
   }
 }, { passive: false });
 
+let lastPinchEndTime = 0; // Variable de sécurité
+
 window.addEventListener('touchend', (e) => {
-  if (e.touches.length < 2) initialPinchDistance = null; // Stoppe le Pinch
+  if (e.touches.length < 2) {
+    if (initialPinchDistance !== null) {
+      lastPinchEndTime = new Date().getTime(); // On mémorise l'heure de fin du zoom
+    }
+    initialPinchDistance = null; // Stoppe le Pinch
+  }
   if (e.touches.length === 0) endDrag(); // Stoppe le glissement
 });
 
-// =========================================================
-// RÉPARATION DU BOUTON RETOUR
-// =========================================================
-const btnRetour = document.getElementById('retourCarte');
-if (btnRetour) {
-  // On utilise 'click' qui est universel
-  btnRetour.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation(); // Empêche tout conflit avec la carte
-
-    // 1. On retire les classes de zoom et de fiche
-    document.body.classList.remove('fiche-mode', 'zoomed');
-    document.querySelectorAll('.province').forEach(p => p.classList.remove('active-province'));
-
-    // 2. On remet le zoom au minimum de départ selon l'appareil
-    const isMobile = window.innerWidth <= 768;
-    zoomScale = isMobile ? 0.7 : 1.0; 
-    translateX = 0;
-    translateY = 0;
-
-    // 3. On réactive les transitions pour un retour fluide
-    if (svgMap) {
-      svgMap.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
-    }
-    
-    appliquerTransformation();
-  });
-}
 
 // =========================================================
-// 4. ANIMATION DE LA BARRE DE RECHERCHE
+// 4. GESTION DES BOUTONS FLOTTANTS (LOUPE ET RÉGIONS)
 // =========================================================
 const searchContainer = document.getElementById('searchContainer');
 const searchToggleBtn = document.getElementById('searchToggleBtn');
-const inputRecherche = document.getElementById('searchProvince');
+const inputRecherche = document.querySelector('.search-input'); // Trouve l'input dynamiquement
 
-if (searchToggleBtn && searchContainer && inputRecherche) {
+const regionContainer = document.getElementById('regionContainer');
+const regionToggleBtn = document.getElementById('regionToggleBtn');
+
+// A. Ouvrir/Fermer la Loupe
+if (searchToggleBtn && searchContainer) {
   searchToggleBtn.addEventListener('click', (e) => {
-    e.stopPropagation(); 
+    e.stopPropagation(); // Empêche le clic de fermer immédiatement
+    if (regionContainer) regionContainer.classList.remove('active'); // Ferme l'autre
     searchContainer.classList.toggle('active');
     
-    if (searchContainer.classList.contains('active')) {
+    if (searchContainer.classList.contains('active') && inputRecherche) {
       setTimeout(() => inputRecherche.focus(), 100);
-    } else {
-      inputRecherche.value = '';
-    }
-  });
-
-  document.addEventListener('click', (e) => {
-    if (searchContainer.classList.contains('active') && !searchContainer.contains(e.target)) {
-      searchContainer.classList.remove('active');
-      inputRecherche.value = '';
     }
   });
 }
+
+// B. Ouvrir/Fermer les Régions (Mobile)
+if (regionToggleBtn && regionContainer) {
+  regionToggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (searchContainer) searchContainer.classList.remove('active'); // Ferme l'autre
+    regionContainer.classList.toggle('active');
+  });
+}
+
+// C. Fermer si on clique sur la carte (dans le vide)
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.top-right-floating-ui')) {
+    if (searchContainer) searchContainer.classList.remove('active');
+    if (regionContainer) regionContainer.classList.remove('active');
+  }
+});
+
+// D. Rendre les boutons "Nord/Centre/Sud" du rond fonctionnels
+document.querySelectorAll('.region-pill-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // 1. On ferme la petite pilule
+    if (regionContainer) regionContainer.classList.remove('active');
+    
+    // 2. On déclenche le vrai bouton PC (qui gère le zoom)
+    const regionName = btn.getAttribute('data-region-btn');
+    const boutonEquivPC = document.querySelector(`.dock-btn[data-region-btn="${regionName}"]`);
+    if (boutonEquivPC) {
+      boutonEquivPC.click(); 
+    }
+  });
+});
 
 // =========================================================
 // 5. FILTRE DES RÉGIONS AUTOMATIQUE
@@ -499,3 +541,127 @@ document.addEventListener('click', (e) => {
 
 // Initialisation de sécurité au démarrage
 ajusterZoom(ZOOM_MIN);
+
+// =========================================================
+// 6. DOUBLE-TAP SUR MOBILE POUR RÉINITIALISER
+// =========================================================
+let lastTapTime = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+
+if (carteContainer) {
+  // On mémorise où le doigt se pose
+  carteContainer.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  }, { passive: true });
+
+  carteContainer.addEventListener('touchend', (e) => {
+    // 🛑 SÉCURITÉ 1 : On bloque si on vient de zoomer il y a moins de 500ms
+    if (new Date().getTime() - lastPinchEndTime < 500) return;
+
+    if (e.changedTouches.length === 1) {
+      const endX = e.changedTouches[0].clientX;
+      const endY = e.changedTouches[0].clientY;
+      const distance = Math.hypot(endX - touchStartX, endY - touchStartY);
+
+      // 🛑 SÉCURITÉ 2 : Si le doigt a glissé de plus de 10px, c'est un drag, pas un tap
+      if (distance > 10) return;
+
+      const currentTime = new Date().getTime();
+      const tapLength = currentTime - lastTapTime;
+      
+      if (tapLength < 300 && tapLength > 0) {
+        e.preventDefault(); 
+        
+        if (document.body.classList.contains('fiche-mode')) {
+          const btnRetour = document.getElementById('retourCarte');
+          if (btnRetour) btnRetour.click();
+        } else {
+          translateX = 0;
+          translateY = 0;
+          document.documentElement.style.setProperty('--stroke-dynamic-width', `${0.6 / Math.sqrt(ZOOM_MIN)}px`);
+          ajusterZoom(ZOOM_MIN);
+          if (svgMap) {
+            svgMap.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease';
+            appliquerTransformation();
+          }
+        }
+      }
+      lastTapTime = currentTime;
+    }
+  });
+
+// =========================================================
+// GESTION DE LA FICHE (FERMETURE ET TIROIR 3 ÉTAPES)
+// =========================================================
+const sidebarLeft = document.querySelector('.app-sidebar-left');
+
+// Fonction universelle de fermeture
+function fermerFiche() {
+  document.body.classList.remove('fiche-mode', 'zoomed');
+  document.querySelectorAll('.province').forEach(p => p.classList.remove('active-province'));
+  if (sidebarLeft) sidebarLeft.classList.remove('sheet-expanded'); 
+  
+  zoomScale = ZOOM_MIN;
+  translateX = 0;
+  translateY = 0;
+  document.documentElement.style.setProperty('--stroke-dynamic-width', `${0.6 / Math.sqrt(ZOOM_MIN)}px`);
+  
+  if (svgMap) {
+    svgMap.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
+  }
+  appliquerTransformation();
+}
+
+// 1. Bouton retour classique (Pour PC)
+const btnRetour = document.getElementById('retourCarte') || document.querySelector('.btn-retour');
+if (btnRetour) {
+  btnRetour.addEventListener('click', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    fermerFiche();
+  });
+}
+
+// 2. Logique du Tiroir Tactile (Mobile)
+let startYSheet = 0;
+let actionRealisee = false; // 🌟 LE VERROU : Empêche de déclencher 2 choses en un seul glissement
+
+if (sidebarLeft) {
+  sidebarLeft.addEventListener('touchstart', (e) => {
+    if (window.innerWidth > 768) return;
+    startYSheet = e.touches[0].clientY; 
+    actionRealisee = false; // 🌟 On réinitialise le verrou à chaque fois qu'on pose le doigt
+  }, { passive: true });
+
+  sidebarLeft.addEventListener('touchmove', (e) => {
+    if (window.innerWidth > 768) return;
+    if (actionRealisee) return; // 🌟 Si une action a déjà été faite, on ignore le reste du mouvement
+    
+    const currentY = e.touches[0].clientY;
+    const diffY = startYSheet - currentY; 
+
+    if (sidebarLeft.scrollTop <= 0) {
+      
+      if (diffY > 40 && !sidebarLeft.classList.contains('sheet-expanded')) {
+        // ACTION 1 : Agrandir la fiche
+        sidebarLeft.classList.add('sheet-expanded');
+        actionRealisee = true; // On verrouille
+      } 
+      else if (diffY < -40) {
+        if (sidebarLeft.classList.contains('sheet-expanded')) {
+          // ACTION 2 : Réduire la fiche (mais ne pas la fermer)
+          sidebarLeft.classList.remove('sheet-expanded');
+          actionRealisee = true; // On verrouille, il faudra lever le doigt pour fermer
+        } else {
+          // ACTION 3 : Fermer complètement la fiche
+          fermerFiche();
+          actionRealisee = true; // On verrouille
+        }
+      }
+    }
+  }, { passive: true });
+}
+}
