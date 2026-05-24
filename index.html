@@ -2,22 +2,38 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">  
   <title>Vietnam Interactif</title>
-  <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body class="page">
 
 <div class="app-container">
-    
+
+  <div class="floating-regions" id="regionContainer">
+    <button class="region-toggle-btn" id="regionToggleBtn" aria-label="Menu des régions">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+    <div class="regions-list">
+      <button class="region-pill-btn" data-region-btn="Nord">Nord</button>
+      <button class="region-pill-btn" data-region-btn="Centre">Centre</button>
+      <button class="region-pill-btn" data-region-btn="Sud">Sud</button>
+    </div>
+  </div>
+
   <div class="floating-search" id="searchContainer">
     <button class="search-icon-btn" id="searchToggleBtn" aria-label="Ouvrir la recherche">
       <svg viewBox="0 0 24 24"><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></svg>
     </button>
-    <input placeholder="Rechercher une province" type="search" class="search-input" id="searchProvince">
-    <ul id="search-suggestions" class="search-suggestions"></ul>
+    <input type="search" id="searchInput" class="search-input" placeholder="Rechercher...">
   </div>
+
+  <div id="province-hover-label"></div>
+
 
   <div class="app-body">
     <aside class="app-sidebar-left" id="ficheInfo">
