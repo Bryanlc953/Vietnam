@@ -195,7 +195,7 @@ document.getElementById('zoomReset')?.addEventListener('click', () => {
   ajusterZoom(ZOOM_MIN);
 });
 
-// Événements de Drag (Glissement)
+
 // =========================================================
 // DRAG & DROP (SOURIS ET TACTILE)
 // =========================================================
@@ -232,41 +232,100 @@ const endDrag = () => {
   }
 };
 
+// Variables pour mémoriser l'écart des doigts au début du pincement
+let initialPinchDistance = null;
+let initialZoom = 1;
+let pinchCenterX = 0;
+let pinchCenterY = 0;
+
 if (svgMap) {
   // --- ÉVÉNEMENTS SOURIS (PC) ---
   svgMap.addEventListener('mousedown', (e) => startDrag(e.clientX, e.clientY));
-  window.addEventListener('mousemove', (e) => doDrag(e.clientX, e.clientY));
-  window.addEventListener('mouseup', endDrag);
-
+  
   // --- ÉVÉNEMENTS TACTILES (MOBILE) ---
   svgMap.addEventListener('touchstart', (e) => {
-    if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY);
-  }, { passive: false });
-  
+    // Si la fiche est ouverte, on gèle la carte
+    if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
+    
+    if (e.touches.length === 1) {
+      // 👆 UN DOIGT : Glissement normal (Drag)
+      initialPinchDistance = null;
+      startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    } 
+    else if (e.touches.length === 2) {
+      // ✌️ DEUX DOIGTS : Début du Pinch-to-Zoom
+      e.preventDefault(); 
+      isPanning = false; // On annule le glissement
+      
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      
+      // On calcule la distance initiale entre les deux doigts
+      initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      initialZoom = zoomScale;
+      
+      // On trouve le point central entre les deux doigts pour zoomer vers ce point
+      const rect = carteContainer.getBoundingClientRect();
+      pinchCenterX = ((t1.clientX + t2.clientX) / 2) - rect.left;
+      pinchCenterY = ((t1.clientY + t2.clientY) / 2) - rect.top;
+    }
+  }, { passive: false }); // 🛑 Doit être "false" pour pouvoir bloquer le comportement de Safari
+
   window.addEventListener('touchmove', (e) => {
+    if (window.innerWidth <= 768 && document.body.classList.contains('fiche-mode')) return;
+
     if (e.touches.length === 1 && isPanning) {
-      e.preventDefault(); // Empêche l'écran du téléphone de défiler
+      // 👆 UN DOIGT : On déplace la carte
+      e.preventDefault(); 
       doDrag(e.touches[0].clientX, e.touches[0].clientY);
+    } 
+    else if (e.touches.length === 2 && initialPinchDistance) {
+      // ✌️ DEUX DOIGTS : On zoome la carte
+      e.preventDefault();
+      if (document.body.classList.contains('fiche-mode')) userInteractedWithZoom = true;
+      
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      
+      // Nouvelle distance entre les doigts
+      const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      
+      // Calcul du nouveau zoom basé sur l'écartement
+      const scaleChange = currentDistance / initialPinchDistance;
+      const nouveauZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, initialZoom * scaleChange));
+      
+      if (nouveauZoom === zoomScale) return;
+
+      // Calcul magique (comme la molette) pour garder la carte centrée sous les doigts
+      const cx = carteContainer.getBoundingClientRect().width / 2;
+      const cy = carteContainer.getBoundingClientRect().height / 2;
+      const dx = pinchCenterX - cx;
+      const dy = pinchCenterY - cy;
+
+      const ratio = nouveauZoom / zoomScale;
+      translateX = translateX * ratio + dx * (1 - ratio);
+      translateY = translateY * ratio + dy * (1 - ratio);
+      
+      zoomScale = nouveauZoom;
+      document.documentElement.style.setProperty('--stroke-dynamic-width', `${0.6 / Math.sqrt(zoomScale)}px`);
+      
+      // On enlève la transition pour que le zoom au doigt soit instantané et fluide
+      svgMap.style.transition = 'none'; 
+      appliquerTransformation();
     }
   }, { passive: false });
   
-  window.addEventListener('touchend', endDrag);
+  // Quand on lève le ou les doigts, on remet les animations fluides en marche
+  window.addEventListener('touchend', () => {
+    initialPinchDistance = null;
+    if (isPanning) {
+      isPanning = false;
+    }
+    if (svgMap) {
+      svgMap.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
+    }
+  });
 }
-
-// Bouton Retour
-document.getElementById('retourCarte')?.addEventListener('click', () => {
-  document.body.classList.remove('fiche-mode');
-  document.querySelectorAll('.province').forEach(p => p.classList.remove('active-province'));
-  
-  if (!userInteractedWithZoom) {
-    translateX = 0;
-    translateY = 0;
-    ajusterZoom(ZOOM_MIN);
-  } else {
-    if (svgMap) svgMap.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1)';
-    appliquerTransformation();
-  }
-});
 
 // =========================================================
 // 4. ANIMATION DE LA BARRE DE RECHERCHE
@@ -323,7 +382,7 @@ const regionViewsDesktop = {
   "Sud":    { scale: 2.5, x: 0,   y: -750 }
 };
 const regionViewsMobile = {
-  "Nord":   { scale: 1.4, x: 600, y: 300 }, // Zoom plus doux, et décalé vers le haut
+  "Nord":   { scale: 1.4, x: 100, y: 300 }, // Zoom plus doux, et décalé vers le haut
   "Centre": { scale: 1.1, x: 0, y: 0 },
   "Sud":    { scale: 1.5, x: 0, y: -300 }
 };
