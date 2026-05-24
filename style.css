@@ -729,5 +729,14 @@ body.fiche-mode .app-sidebar-right {
     pointer-events: none;
     transition: opacity 0.3s ease;
   }
+  /* 1. On descend la barre de recherche pour fuir la barre Safari */
+  .floating-search {
+    top: 75px !important; /* Force la position sous l'interface d'iOS */
+  }
+
+  /* 2. On interdit STRICTEMENT au navigateur de zoomer ou scroller quand on touche la carte */
+  #carteContainer {
+    touch-action: none; 
+  }
 }
 
