@@ -692,7 +692,7 @@ body.fiche-mode .app-sidebar-right {
   .app-sidebar-right {
     position: absolute;
     top: auto;
-    bottom: 48px;
+    bottom: 65px;
     right: 50%;
     transform: translateX(50%); /* Centre la barre parfaitement au milieu */
     width: 90%;
@@ -732,11 +732,14 @@ body.fiche-mode .app-sidebar-right {
   /* 1. On descend la barre de recherche pour fuir la barre Safari */
   .floating-search {
     top: 75px !important; /* Force la position sous l'interface d'iOS */
+    right: 15px !important;
   }
 
   /* 2. On interdit STRICTEMENT au navigateur de zoomer ou scroller quand on touche la carte */
   #carteContainer {
     touch-action: none; 
+    height: 100% !important;
+    margin-top: -40px; /* Ajuste cette valeur négative pour remonter TOUTE la carte sur l'axe Y */
   }
 }
 
