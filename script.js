@@ -5,8 +5,11 @@ const carteContainer = document.getElementById('carteContainer');
 const svgMap = document.getElementById('svgVietnam');
 const hoverLabel = document.getElementById('province-hover-label');
 
-let zoomScale = 1.0; 
-const ZOOM_MIN = 1.0; 
+const isMobileInit = window.innerWidth <= 768;
+
+// 🌟 ZOOM_MIN n'est plus une constante, il est plus petit sur mobile (0.7)
+let ZOOM_MIN = isMobileInit ? 0.7 : 1.0; 
+let zoomScale = ZOOM_MIN; 
 const ZOOM_MAX = 4.5;
 const ZOOM_STEP = 0.2;
 
@@ -78,20 +81,24 @@ function ouvrirFiche(id) {
     const tailleDeBasePx = rect.width / zoomScale; 
     const pixelRatio = tailleDeBasePx / vb[2];
     
-    zoomScale = 2.4; 
+    const isMobile = window.innerWidth <= 768;
+    
+    // 🌟 1. On réduit fortement le zoom pour mobile
+    zoomScale = isMobile ? 1.4 : 2.4; 
     
     const correctionsManuelles = {
       "LamDong": { x: -580, y: 10 }
     };
     
-    // 📱 --- DEBUT DU BLOC RESPONSIVE (MOBILE / PC) ---
-    const isMobile = window.innerWidth <= 768;
+    // 🌟 2. On calcule sur la taille fixe du conteneur (qui gère bien Safari grâce au 100dvh)
+    const conteneurHauteur = carteContainer.getBoundingClientRect().height;
     
-    // Sur PC, on garde ton ancrage à 730. Sur mobile, on décale vers le haut (22% de l'écran).
+    // 🌟 3. Sur mobile, on remonte la carte visuellement de 25% pour qu'elle s'affiche au-dessus de la fiche
     let pointAncrageX = isMobile ? 0 : 730; 
-    let pointAncrageY = isMobile ? -(window.innerHeight * 0.22) : 0; 
+    let pointAncrageY = isMobile ? -(conteneurHauteur * 0.25) : 0; 
     
-    if (correctionsManuelles[id]) {
+    // On n'applique les corrections manuelles (décalage à gauche) que sur PC
+    if (correctionsManuelles[id] && !isMobile) {
       pointAncrageX += correctionsManuelles[id].x;
       pointAncrageY += correctionsManuelles[id].y;
     }
@@ -310,10 +317,15 @@ const regionMapping = {
   "HauGiang": "Sud", "SocTrang": "Sud", "BacLieu": "Sud", "CaMau": "Sud"
 };
 
-const regionViews = {
-  "Nord":   { scale: 2.2, x: 100,   y: 720 },  
-  "Centre": { scale: 1.5, x: 0,     y: 0   },  
-  "Sud":    { scale: 2.5, x: 0,     y: -750 }  
+const regionViewsDesktop = {
+  "Nord":   { scale: 2.2, x: 100, y: 720 },
+  "Centre": { scale: 1.5, x: 0,   y: 0   },
+  "Sud":    { scale: 2.5, x: 0,   y: -750 }
+};
+const regionViewsMobile = {
+  "Nord":   { scale: 1.4, x: 0, y: 300 }, // Zoom plus doux, et décalé vers le haut
+  "Centre": { scale: 1.1, x: 0, y: 0 },
+  "Sud":    { scale: 1.5, x: 0, y: -300 }
 };
 
 let regionActive = null;
@@ -349,7 +361,9 @@ document.querySelectorAll('.dock-btn[data-region-btn]').forEach(btn => {
       
       regionActive = regionTarget;
       
-      const view = regionViews[regionTarget];
+      const isMobile = window.innerWidth <= 768;
+      const view = isMobile ? regionViewsMobile[regionTarget] : regionViewsDesktop[regionTarget];
+      
       zoomScale = view.scale;
       translateX = view.x;
       translateY = view.y;
