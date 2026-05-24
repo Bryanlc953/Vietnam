@@ -11,18 +11,18 @@
 
 
 body {
-  margin: 0;
+margin: 0;
   background: var(--bg);
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
-  height: 100vh;
+  height: 100dvh; /* 🌟 dvh adapte la taille en direct avec les barres Safari */
   width: 100vw;
 }
 
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh; /* 🌟 dvh ici aussi */
   width: 100vw;
 }
 
@@ -692,7 +692,7 @@ body.fiche-mode .app-sidebar-right {
   .app-sidebar-right {
     position: absolute;
     top: auto;
-    bottom: 20px;
+    bottom: 48px;
     right: 50%;
     transform: translateX(50%); /* Centre la barre parfaitement au milieu */
     width: 90%;
