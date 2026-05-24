@@ -323,7 +323,7 @@ const regionViewsDesktop = {
   "Sud":    { scale: 2.5, x: 0,   y: -750 }
 };
 const regionViewsMobile = {
-  "Nord":   { scale: 1.4, x: 100, y: 300 }, // Zoom plus doux, et décalé vers le haut
+  "Nord":   { scale: 1.4, x: 600, y: 300 }, // Zoom plus doux, et décalé vers le haut
   "Centre": { scale: 1.1, x: 0, y: 0 },
   "Sud":    { scale: 1.5, x: 0, y: -300 }
 };
