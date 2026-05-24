@@ -326,6 +326,34 @@ if (svgMap) {
     }
   });
 }
+// =========================================================
+// RÉPARATION DU BOUTON RETOUR
+// =========================================================
+const btnRetour = document.getElementById('retourCarte');
+if (btnRetour) {
+  // On utilise 'click' qui est universel
+  btnRetour.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation(); // Empêche tout conflit avec la carte
+
+    // 1. On retire les classes de zoom et de fiche
+    document.body.classList.remove('fiche-mode', 'zoomed');
+    document.querySelectorAll('.province').forEach(p => p.classList.remove('active-province'));
+
+    // 2. On remet le zoom au minimum de départ selon l'appareil
+    const isMobile = window.innerWidth <= 768;
+    zoomScale = isMobile ? 0.7 : 1.0; 
+    translateX = 0;
+    translateY = 0;
+
+    // 3. On réactive les transitions pour un retour fluide
+    if (svgMap) {
+      svgMap.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), fill 0.2s ease, opacity 0.3s ease';
+    }
+    
+    appliquerTransformation();
+  });
+}
 
 // =========================================================
 // 4. ANIMATION DE LA BARRE DE RECHERCHE
